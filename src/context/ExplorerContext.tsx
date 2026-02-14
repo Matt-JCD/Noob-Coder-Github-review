@@ -105,7 +105,7 @@ function explorerReducer(state: ExplorerState, action: ExplorerAction): Explorer
           ...col,
           items: col.items.map((item) => ({
             ...item,
-            explanation: explanations[item.name] || item.explanation,
+            explanation: explanations[item.name] ?? item.explanation,
             isLoading: explanations[item.name] !== undefined ? false : item.isLoading,
           })),
         };
@@ -267,10 +267,15 @@ export function ExplorerProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      // Chunk into pairs of 2 and process sequentially so results stream in
+      // Process items in chunks of 2 so results stream in one batch at a time
       const CHUNK_SIZE = 2;
+      const totalChunks = Math.ceil(batchItems.length / CHUNK_SIZE);
+      console.log(`[explain] ${batchItems.length} items, ${totalChunks} chunks for ${folderPath}`);
+
       for (let i = 0; i < batchItems.length; i += CHUNK_SIZE) {
+        const chunkIndex = Math.floor(i / CHUNK_SIZE) + 1;
         const chunk = batchItems.slice(i, i + CHUNK_SIZE);
+        console.log(`[explain] Chunk ${chunkIndex}/${totalChunks}: ${chunk.map(c => c.name).join(", ")}`);
 
         try {
           const res = await fetch("/api/explain", {
@@ -285,9 +290,10 @@ export function ExplorerProvider({ children }: { children: React.ReactNode }) {
           });
 
           if (!res.ok) {
-            console.error("Explanation request failed:", res.status);
+            const errorText = await res.text().catch(() => "");
+            console.error(`[explain] Chunk ${chunkIndex} failed: ${res.status} ${errorText}`);
             const fallback: Record<string, string> = {};
-            chunk.forEach((item) => { fallback[item.name] = ""; });
+            chunk.forEach((item) => { fallback[item.name] = "Unable to explain this item."; });
             dispatch({
               type: "SET_EXPLANATIONS",
               payload: { folderPath, explanations: fallback },
@@ -296,6 +302,8 @@ export function ExplorerProvider({ children }: { children: React.ReactNode }) {
           }
 
           const data = await res.json();
+          const receivedCount = Object.keys(data.explanations || {}).length;
+          console.log(`[explain] Chunk ${chunkIndex} returned ${receivedCount} explanations`);
           dispatch({
             type: "SET_EXPLANATIONS",
             payload: { folderPath, explanations: data.explanations },
@@ -304,15 +312,16 @@ export function ExplorerProvider({ children }: { children: React.ReactNode }) {
             dispatch({ type: "UPDATE_TOKEN_USAGE", payload: data.usage });
           }
         } catch (err) {
-          console.error("Failed to fetch explanations:", err);
+          console.error(`[explain] Chunk ${chunkIndex} error:`, err);
           const fallback: Record<string, string> = {};
-          chunk.forEach((item) => { fallback[item.name] = ""; });
+          chunk.forEach((item) => { fallback[item.name] = "Unable to explain this item."; });
           dispatch({
             type: "SET_EXPLANATIONS",
             payload: { folderPath, explanations: fallback },
           });
         }
       }
+      console.log(`[explain] All ${totalChunks} chunks complete for ${folderPath}`);
     },
     []
   );

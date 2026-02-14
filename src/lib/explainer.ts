@@ -114,6 +114,7 @@ Respond as JSON with this exact format: {"explanations": {"item-name": "explanat
 Use the exact item names as keys. Respond with ONLY the JSON, no other text.`;
 
   // Use Haiku for batch explanations — faster and cheaper for short 1-2 sentence outputs
+  console.log(`[explainBatch] Calling Haiku with ${items.length} items, maxTokens=${Math.max(512, items.length * 100)}`);
   const { text, usage } = await invokeWithTracing(
     "explainBatch",
     HAIKU_MODEL,
@@ -123,13 +124,20 @@ Use the exact item names as keys. Respond with ONLY the JSON, no other text.`;
     { itemCount: items.length },
   );
 
+  console.log(`[explainBatch] Response length: ${text.length} chars, usage: ${usage.inputTokens}in/${usage.outputTokens}out`);
+
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { explanations: {}, usage };
+    if (!jsonMatch) {
+      console.error("[explainBatch] No JSON found in response:", text.slice(0, 200));
+      return { explanations: {}, usage };
+    }
     const parsed = JSON.parse(jsonMatch[0]);
-    return { explanations: parsed.explanations || parsed, usage };
+    const explanations = parsed.explanations || parsed;
+    console.log(`[explainBatch] Parsed ${Object.keys(explanations).length} explanations`);
+    return { explanations, usage };
   } catch {
-    console.error("Failed to parse batch explanation response:", text);
+    console.error("[explainBatch] Failed to parse response:", text.slice(0, 200));
     return { explanations: {}, usage };
   }
 }

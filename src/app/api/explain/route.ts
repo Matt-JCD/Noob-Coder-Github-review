@@ -29,9 +29,14 @@ export async function POST(request: NextRequest) {
     // Batch explain uncached items
     let usage = { inputTokens: 0, outputTokens: 0 };
 
+    console.log(`[api/explain] ${items.length} items received, ${Object.keys(results).length} cached, ${uncached.length} uncached`);
+
     if (uncached.length > 0) {
       const response = await explainBatch(uncached, repoDescription);
       usage = response.usage;
+
+      const explanationCount = Object.keys(response.explanations).length;
+      console.log(`[api/explain] explainBatch returned ${explanationCount} explanations for ${uncached.length} items`);
 
       for (const [name, explanation] of Object.entries(response.explanations)) {
         const cacheKey = `${repoKey}:${folderPath}:${name}`;
