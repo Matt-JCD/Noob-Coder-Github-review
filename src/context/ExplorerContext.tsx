@@ -244,7 +244,7 @@ export function ExplorerProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      // Get children info for folders
+      // Build batch items with children info
       const batchItems = uncachedItems.map((item) => {
         let childrenStr: string | undefined;
         if (item.type === "folder") {
@@ -267,42 +267,51 @@ export function ExplorerProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      try {
-        const res = await fetch("/api/explain", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            items: batchItems,
-            repoDescription: currentState.repoMeta?.description || "",
-            repoKey: `${currentState.repoMeta?.owner}/${currentState.repoMeta?.repo}`,
-            folderPath,
-          }),
-        });
+      // Chunk into pairs of 2 and process sequentially so results stream in
+      const CHUNK_SIZE = 2;
+      for (let i = 0; i < batchItems.length; i += CHUNK_SIZE) {
+        const chunk = batchItems.slice(i, i + CHUNK_SIZE);
 
-        if (!res.ok) {
-          console.error("Explanation request failed:", res.status);
-          // Mark items as not loading even on error
-          const fallback: Record<string, string> = {};
-          uncachedItems.forEach((item) => {
-            fallback[item.name] = "";
+        try {
+          const res = await fetch("/api/explain", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              items: chunk,
+              repoDescription: currentState.repoMeta?.description || "",
+              repoKey: `${currentState.repoMeta?.owner}/${currentState.repoMeta?.repo}`,
+              folderPath,
+            }),
           });
+
+          if (!res.ok) {
+            console.error("Explanation request failed:", res.status);
+            const fallback: Record<string, string> = {};
+            chunk.forEach((item) => { fallback[item.name] = ""; });
+            dispatch({
+              type: "SET_EXPLANATIONS",
+              payload: { folderPath, explanations: fallback },
+            });
+            continue;
+          }
+
+          const data = await res.json();
+          dispatch({
+            type: "SET_EXPLANATIONS",
+            payload: { folderPath, explanations: data.explanations },
+          });
+          if (data.usage) {
+            dispatch({ type: "UPDATE_TOKEN_USAGE", payload: data.usage });
+          }
+        } catch (err) {
+          console.error("Failed to fetch explanations:", err);
+          const fallback: Record<string, string> = {};
+          chunk.forEach((item) => { fallback[item.name] = ""; });
           dispatch({
             type: "SET_EXPLANATIONS",
             payload: { folderPath, explanations: fallback },
           });
-          return;
         }
-
-        const data = await res.json();
-        dispatch({
-          type: "SET_EXPLANATIONS",
-          payload: { folderPath, explanations: data.explanations },
-        });
-        if (data.usage) {
-          dispatch({ type: "UPDATE_TOKEN_USAGE", payload: data.usage });
-        }
-      } catch (err) {
-        console.error("Failed to fetch explanations:", err);
       }
     },
     []

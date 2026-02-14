@@ -56,12 +56,15 @@ export default function ExplorerItem({ item, isSelected, onClick, onDeepDive, re
               {item.explanation}
             </p>
             {!item.isDeepDive && onDeepDive && (
-              <button
+              <span
+                role="link"
+                tabIndex={0}
                 onClick={(e) => { e.stopPropagation(); onDeepDive(); }}
-                className="text-[10px] text-accent/50 hover:text-accent mt-0.5 transition-colors"
+                onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onDeepDive(); } }}
+                className="text-[10px] text-accent/50 hover:text-accent mt-0.5 transition-colors cursor-pointer inline-block"
               >
                 Deep dive
-              </button>
+              </span>
             )}
             {item.isDeepDive && (
               <span className="text-[10px] text-accent/40 mt-0.5 inline-block">

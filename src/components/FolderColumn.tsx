@@ -7,6 +7,7 @@ import ExplorerItem from "./ExplorerItem";
 import CostConfirm from "./CostConfirm";
 import { isHidden } from "@/lib/filter";
 import { estimateBatchCost, estimateFileCost, estimateDeepDiveCost, CostEstimate } from "@/lib/estimator";
+import LoadingTimer from "./LoadingTimer";
 
 interface FolderColumnProps {
   column: Column;
@@ -103,7 +104,7 @@ export default function FolderColumn({ column, depth }: FolderColumnProps) {
       )}
       {isExplaining && (
         <div className="p-2 border-b border-border-color text-xs text-text-muted text-center">
-          Explaining...
+          Explaining ({column.items.filter(i => i.isLoading).length} remaining)
         </div>
       )}
       {allExplained && !fileEstimate && !deepDiveEstimate && (

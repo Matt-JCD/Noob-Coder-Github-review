@@ -6,6 +6,7 @@ import { useExplorer } from "@/context/ExplorerContext";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import ColumnExplorer from "@/components/ColumnExplorer";
 import TokenTracker from "@/components/TokenTracker";
+import LoadingTimer from "@/components/LoadingTimer";
 
 export default function ExploreContent() {
   const searchParams = useSearchParams();
@@ -28,7 +29,8 @@ export default function ExploreContent() {
         <div className="text-center">
           <div className="inline-block w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mb-4" />
           <p className="text-text-secondary">Loading repository...</p>
-          <p className="text-text-muted text-sm mt-1">Fetching file tree from GitHub</p>
+          <p className="text-text-muted text-sm mt-1 mb-2">Fetching file tree from GitHub</p>
+          <LoadingTimer estimatedSeconds={5} />
         </div>
       </div>
     );

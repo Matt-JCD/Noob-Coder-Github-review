@@ -2,6 +2,7 @@
 
 import { useExplorer } from "@/context/ExplorerContext";
 import CodeViewer from "./CodeViewer";
+import LoadingTimer from "./LoadingTimer";
 
 export default function FileDetail() {
   const { state } = useExplorer();
@@ -12,11 +13,18 @@ export default function FileDetail() {
   if (detail.isLoading) {
     return (
       <div className="flex-shrink-0 w-[480px] border-r border-border-color bg-bg-secondary p-6 overflow-y-auto h-full">
-        <div className="space-y-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-text-primary mb-1">{detail.name}</h2>
+          <p className="text-xs text-text-muted font-mono">{detail.path}</p>
+        </div>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
           <div>
-            <div className="skeleton h-7 w-48 mb-2" />
-            <div className="skeleton h-4 w-64" />
+            <p className="text-sm text-text-secondary">Analyzing file with Sonnet...</p>
+            <LoadingTimer estimatedSeconds={8} compact />
           </div>
+        </div>
+        <div className="space-y-6">
           <div>
             <div className="skeleton h-5 w-32 mb-2" />
             <div className="skeleton h-4 w-full mb-1" />
@@ -27,11 +35,6 @@ export default function FileDetail() {
             <div className="skeleton h-5 w-28 mb-2" />
             <div className="skeleton h-4 w-full mb-1" />
             <div className="skeleton h-4 w-5/6" />
-          </div>
-          <div>
-            <div className="skeleton h-5 w-36 mb-2" />
-            <div className="skeleton h-4 w-full mb-1" />
-            <div className="skeleton h-4 w-4/5" />
           </div>
         </div>
       </div>
