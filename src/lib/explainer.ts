@@ -1,6 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { SystemMessage, HumanMessage } from "@langchain/core/messages";
+import type { AIMessage } from "@langchain/core/messages";
+import { getTracer, SpanType, extractTokenUsage } from "@/lib/prefactor";
 
-const client = new Anthropic();
+const HAIKU_MODEL = "claude-haiku-4-5-20251001";
+const SONNET_MODEL = "claude-sonnet-4-5-20250929";
 
 const SYSTEM_PROMPT = `You are explaining a codebase to someone who has never written a line of code in their life. They are smart and capable — they just don't know programming terminology.
 
@@ -24,6 +28,64 @@ export interface TokenUsage {
   outputTokens: number;
 }
 
+function extractText(response: AIMessage): string {
+  if (typeof response.content === "string") return response.content;
+  if (Array.isArray(response.content)) {
+    return response.content
+      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+  }
+  return "";
+}
+
+function extractAppUsage(response: AIMessage): TokenUsage {
+  const meta = response.usage_metadata;
+  return {
+    inputTokens: meta?.input_tokens ?? 0,
+    outputTokens: meta?.output_tokens ?? 0,
+  };
+}
+
+async function invokeWithTracing(
+  spanName: string,
+  modelName: string,
+  maxTokens: number,
+  systemPrompt: string,
+  userPrompt: string,
+  metadata?: Record<string, unknown>,
+): Promise<{ text: string; usage: TokenUsage }> {
+  const tracer = getTracer();
+  const span = tracer.startSpan({
+    name: spanName,
+    spanType: SpanType.LLM,
+    inputs: { systemPrompt, userPrompt },
+    metadata,
+  });
+
+  try {
+    const model = new ChatAnthropic({ model: modelName, maxTokens });
+    const response = await model.invoke([
+      new SystemMessage(systemPrompt),
+      new HumanMessage(userPrompt),
+    ]);
+
+    const text = extractText(response);
+    const usage = extractAppUsage(response);
+    const tokenUsage = extractTokenUsage(response) ?? undefined;
+
+    tracer.endSpan(span, {
+      outputs: { text },
+      tokenUsage,
+    });
+
+    return { text, usage };
+  } catch (error) {
+    tracer.endSpan(span, { error: error instanceof Error ? error : new Error(String(error)) });
+    throw error;
+  }
+}
+
 export async function explainBatch(
   items: BatchItem[],
   repoDescription: string
@@ -41,15 +103,7 @@ export async function explainBatch(
     )
     .join("\n");
 
-  // Use Haiku for batch explanations — faster and cheaper for short 1-2 sentence outputs
-  const message = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: Math.max(512, items.length * 100),
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Explain each of these items in plain English. Each explanation should be 1-2 sentences. Use analogies. Never use jargon without defining it. Answer "why does this exist?" not just "what is it called."
+  const userPrompt = `Explain each of these items in plain English. Each explanation should be 1-2 sentences. Use analogies. Never use jargon without defining it. Answer "why does this exist?" not just "what is it called."
 
 Project: ${repoDescription || "A software project"}
 
@@ -57,18 +111,17 @@ Items:
 ${itemList}
 
 Respond as JSON with this exact format: {"explanations": {"item-name": "explanation text", ...}}
-Use the exact item names as keys. Respond with ONLY the JSON, no other text.`,
-      },
-    ],
-  });
+Use the exact item names as keys. Respond with ONLY the JSON, no other text.`;
 
-  const usage: TokenUsage = {
-    inputTokens: message.usage.input_tokens,
-    outputTokens: message.usage.output_tokens,
-  };
-
-  const text =
-    message.content[0].type === "text" ? message.content[0].text : "";
+  // Use Haiku for batch explanations — faster and cheaper for short 1-2 sentence outputs
+  const { text, usage } = await invokeWithTracing(
+    "explainBatch",
+    HAIKU_MODEL,
+    Math.max(512, items.length * 100),
+    SYSTEM_PROMPT,
+    userPrompt,
+    { itemCount: items.length },
+  );
 
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -94,32 +147,24 @@ export async function explainSingleItem(
       ? `This is a folder containing: ${children || "unknown contents"}`
       : `This is a file with extension: ${extension || "unknown"}`;
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-5-20250929",
-    max_tokens: 500,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Give a detailed plain-English explanation of this item from a codebase. 3-5 sentences. Be specific about what it does, why it exists, and what would break without it.
+  const userPrompt = `Give a detailed plain-English explanation of this item from a codebase. 3-5 sentences. Be specific about what it does, why it exists, and what would break without it.
 
 Project: ${repoDescription || "A software project"}
 Item: ${name} (${type})
 Path: ${path}
 ${contextStr}
 
-Respond with ONLY the explanation text, no JSON or formatting.`,
-      },
-    ],
-  });
+Respond with ONLY the explanation text, no JSON or formatting.`;
 
-  const usage: TokenUsage = {
-    inputTokens: message.usage.input_tokens,
-    outputTokens: message.usage.output_tokens,
-  };
+  const { text, usage } = await invokeWithTracing(
+    "explainSingleItem",
+    SONNET_MODEL,
+    500,
+    SYSTEM_PROMPT,
+    userPrompt,
+    { itemName: name, itemType: type },
+  );
 
-  const text =
-    message.content[0].type === "text" ? message.content[0].text : "";
   return { explanation: text.trim(), usage };
 }
 
@@ -145,14 +190,7 @@ export async function explainFile(
     truncated = truncated.slice(0, 15000) + "\n... (truncated)";
   }
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-5-20250929",
-    max_tokens: 1500,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Explain this file to someone who has never coded before.
+  const userPrompt = `Explain this file to someone who has never coded before.
 
 Project: ${repoDescription || "A software project"}
 File: ${name}
@@ -168,18 +206,16 @@ Respond in this exact JSON format (no other text):
   "keyFunctions": [{"name": "human-readable name for this part", "explanation": "what this part does in plain English"}],
   "dependencies": [{"name": "file or package name", "why": "what this file asks it for help with"}],
   "thingsToKnow": ["important pattern or gotcha in plain English"]
-}`,
-      },
-    ],
-  });
+}`;
 
-  const usage: TokenUsage = {
-    inputTokens: message.usage.input_tokens,
-    outputTokens: message.usage.output_tokens,
-  };
-
-  const text =
-    message.content[0].type === "text" ? message.content[0].text : "";
+  const { text, usage } = await invokeWithTracing(
+    "explainFile",
+    SONNET_MODEL,
+    1500,
+    SYSTEM_PROMPT,
+    userPrompt,
+    { fileName: name, language },
+  );
 
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
