@@ -70,7 +70,9 @@ export async function POST(request: NextRequest) {
     };
 
     fileDetailCache.set(cacheKey, result);
-    return NextResponse.json({ ...result, usage });
+    // Sonnet pricing: $3/1M input, $15/1M output
+    const cost = (usage.inputTokens * 3 + usage.outputTokens * 15) / 1_000_000;
+    return NextResponse.json({ ...result, usage: { ...usage, cost } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

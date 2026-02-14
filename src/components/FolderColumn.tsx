@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Column } from "@/types";
+import { Column, ColumnItem } from "@/types";
 import { useExplorer } from "@/context/ExplorerContext";
 import ExplorerItem from "./ExplorerItem";
 import CostConfirm from "./CostConfirm";
 import { isHidden } from "@/lib/filter";
-import { estimateBatchCost } from "@/lib/estimator";
+import { estimateBatchCost, estimateFileCost, estimateDeepDiveCost, CostEstimate } from "@/lib/estimator";
 
 interface FolderColumnProps {
   column: Column;
@@ -14,8 +14,10 @@ interface FolderColumnProps {
 }
 
 export default function FolderColumn({ column, depth }: FolderColumnProps) {
-  const { state, selectFolder, selectFile, requestExplanations } = useExplorer();
+  const { state, selectFolder, selectFile, requestExplanations, requestDeepDive } = useExplorer();
   const [showEstimate, setShowEstimate] = useState(false);
+  const [fileEstimate, setFileEstimate] = useState<{ estimate: CostEstimate; item: ColumnItem } | null>(null);
+  const [deepDiveEstimate, setDeepDiveEstimate] = useState<{ estimate: CostEstimate; item: ColumnItem } | null>(null);
 
   // Build a lookup for recommendations
   const recMap = new Map<string, string>();
@@ -23,11 +25,32 @@ export default function FolderColumn({ column, depth }: FolderColumnProps) {
     recMap.set(rec.path, rec.reason);
   }
 
-  const handleClick = (item: typeof column.items[0]) => {
+  const handleClick = (item: ColumnItem) => {
     if (item.type === "folder") {
       selectFolder(depth, item.path);
     } else {
-      selectFile(depth, item.path);
+      // Show cost estimate before calling AI for file detail
+      const estimate = estimateFileCost(item.size || 1000);
+      setFileEstimate({ estimate, item });
+    }
+  };
+
+  const handleConfirmFile = () => {
+    if (fileEstimate) {
+      selectFile(depth, fileEstimate.item.path);
+      setFileEstimate(null);
+    }
+  };
+
+  const handleDeepDive = (item: ColumnItem) => {
+    const estimate = estimateDeepDiveCost();
+    setDeepDiveEstimate({ estimate: { ...estimate, description: `Deep dive: ${item.name}` }, item });
+  };
+
+  const handleConfirmDeepDive = () => {
+    if (deepDiveEstimate) {
+      requestDeepDive(column.path, deepDiveEstimate.item);
+      setDeepDiveEstimate(null);
     }
   };
 
@@ -48,7 +71,7 @@ export default function FolderColumn({ column, depth }: FolderColumnProps) {
     requestExplanations(column.path, unexplainedItems);
   };
 
-  const estimate = estimateBatchCost(unexplainedItems.length);
+  const batchEstimate = estimateBatchCost(unexplainedItems.length);
 
   // Count hidden items if not showing hidden
   let hiddenCount = 0;
@@ -68,7 +91,7 @@ export default function FolderColumn({ column, depth }: FolderColumnProps) {
   return (
     <div className="flex-shrink-0 w-[280px] border-r border-border-color bg-bg-secondary flex flex-col h-full">
       {/* Explain button / estimate */}
-      {hasUnexplained && !isExplaining && !showEstimate && (
+      {hasUnexplained && !isExplaining && !showEstimate && !fileEstimate && !deepDiveEstimate && (
         <div className="p-2 border-b border-border-color">
           <button
             onClick={handleExplainAll}
@@ -83,16 +106,30 @@ export default function FolderColumn({ column, depth }: FolderColumnProps) {
           Explaining...
         </div>
       )}
-      {allExplained && (
+      {allExplained && !fileEstimate && !deepDiveEstimate && (
         <div className="p-2 border-b border-border-color text-xs text-green-400/70 text-center">
           All items explained
         </div>
       )}
       {showEstimate && (
         <CostConfirm
-          estimate={estimate}
+          estimate={batchEstimate}
           onConfirm={handleConfirmExplain}
           onCancel={() => setShowEstimate(false)}
+        />
+      )}
+      {fileEstimate && (
+        <CostConfirm
+          estimate={{ ...fileEstimate.estimate, description: fileEstimate.item.name }}
+          onConfirm={handleConfirmFile}
+          onCancel={() => setFileEstimate(null)}
+        />
+      )}
+      {deepDiveEstimate && (
+        <CostConfirm
+          estimate={deepDiveEstimate.estimate}
+          onConfirm={handleConfirmDeepDive}
+          onCancel={() => setDeepDiveEstimate(null)}
         />
       )}
 
@@ -104,6 +141,7 @@ export default function FolderColumn({ column, depth }: FolderColumnProps) {
             item={item}
             isSelected={column.selectedPath === item.path}
             onClick={() => handleClick(item)}
+            onDeepDive={() => handleDeepDive(item)}
             recommendation={recMap.get(item.path)}
           />
         ))}

@@ -2,6 +2,11 @@
 // These don't need to be perfect — within 2x is fine.
 // The point is giving the user a sense of cost before committing.
 
+// Batch explanations use Haiku (faster, cheaper)
+const HAIKU_INPUT_PRICE = 0.80; // $ per 1M input tokens
+const HAIKU_OUTPUT_PRICE = 4; // $ per 1M output tokens
+
+// File explanations use Sonnet (better quality for detailed analysis)
 const SONNET_INPUT_PRICE = 3; // $ per 1M input tokens
 const SONNET_OUTPUT_PRICE = 15; // $ per 1M output tokens
 
@@ -26,13 +31,14 @@ export interface CostEstimate {
   estimatedCost: number;
   itemCount: number;
   description: string;
+  model: string;
 }
 
 export function estimateBatchCost(itemCount: number): CostEstimate {
   const inputTokens = SYSTEM_PROMPT_OVERHEAD + itemCount * TOKENS_PER_ITEM_INPUT;
   const outputTokens = itemCount * TOKENS_PER_ITEM_OUTPUT;
   const estimatedCost =
-    (inputTokens * SONNET_INPUT_PRICE + outputTokens * SONNET_OUTPUT_PRICE) / 1_000_000;
+    (inputTokens * HAIKU_INPUT_PRICE + outputTokens * HAIKU_OUTPUT_PRICE) / 1_000_000;
 
   return {
     inputTokens,
@@ -40,6 +46,7 @@ export function estimateBatchCost(itemCount: number): CostEstimate {
     estimatedCost,
     itemCount,
     description: `${itemCount} item${itemCount === 1 ? "" : "s"}`,
+    model: "Haiku",
   };
 }
 
@@ -58,6 +65,23 @@ export function estimateFileCost(fileSizeBytes: number): CostEstimate {
     estimatedCost,
     itemCount: 1,
     description: "1 file",
+    model: "Sonnet",
+  };
+}
+
+export function estimateDeepDiveCost(): CostEstimate {
+  const inputTokens = 200;
+  const outputTokens = 300;
+  const estimatedCost =
+    (inputTokens * SONNET_INPUT_PRICE + outputTokens * SONNET_OUTPUT_PRICE) / 1_000_000;
+
+  return {
+    inputTokens,
+    outputTokens,
+    estimatedCost,
+    itemCount: 1,
+    description: "Deep dive",
+    model: "Sonnet",
   };
 }
 

@@ -130,6 +130,7 @@ export function getChildrenAtPath(
       type,
       extension: ext,
       childCount,
+      size: node.size,
       isLoading: false,
     });
   }

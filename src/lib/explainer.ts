@@ -41,9 +41,10 @@ export async function explainBatch(
     )
     .join("\n");
 
+  // Use Haiku for batch explanations — faster and cheaper for short 1-2 sentence outputs
   const message = await client.messages.create({
-    model: "claude-sonnet-4-5-20250929",
-    max_tokens: 4096,
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: Math.max(512, items.length * 100),
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -80,6 +81,48 @@ Use the exact item names as keys. Respond with ONLY the JSON, no other text.`,
   }
 }
 
+export async function explainSingleItem(
+  name: string,
+  type: "folder" | "file",
+  path: string,
+  repoDescription: string,
+  children?: string,
+  extension?: string
+): Promise<{ explanation: string; usage: TokenUsage }> {
+  const contextStr =
+    type === "folder"
+      ? `This is a folder containing: ${children || "unknown contents"}`
+      : `This is a file with extension: ${extension || "unknown"}`;
+
+  const message = await client.messages.create({
+    model: "claude-sonnet-4-5-20250929",
+    max_tokens: 500,
+    system: SYSTEM_PROMPT,
+    messages: [
+      {
+        role: "user",
+        content: `Give a detailed plain-English explanation of this item from a codebase. 3-5 sentences. Be specific about what it does, why it exists, and what would break without it.
+
+Project: ${repoDescription || "A software project"}
+Item: ${name} (${type})
+Path: ${path}
+${contextStr}
+
+Respond with ONLY the explanation text, no JSON or formatting.`,
+      },
+    ],
+  });
+
+  const usage: TokenUsage = {
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+  };
+
+  const text =
+    message.content[0].type === "text" ? message.content[0].text : "";
+  return { explanation: text.trim(), usage };
+}
+
 interface FileExplanation {
   summary: string;
   keyFunctions: { name: string; explanation: string }[];
@@ -104,7 +147,7 @@ export async function explainFile(
 
   const message = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
-    max_tokens: 4096,
+    max_tokens: 1500,
     system: SYSTEM_PROMPT,
     messages: [
       {

@@ -17,6 +17,7 @@ export default function CostConfirm({ estimate, onConfirm, onCancel }: CostConfi
       <p className="text-text-secondary text-xs mb-3">
         ~{estimate.inputTokens.toLocaleString()} input + ~{estimate.outputTokens.toLocaleString()} output tokens
         {" "}≈ {formatCost(estimate.estimatedCost)}
+        <span className="text-text-muted ml-1">({estimate.model})</span>
       </p>
       <div className="flex gap-2">
         <button

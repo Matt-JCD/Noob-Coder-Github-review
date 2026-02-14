@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ explanations: results, usage });
+    // Haiku pricing: $0.80/1M input, $4/1M output
+    const cost = (usage.inputTokens * 0.80 + usage.outputTokens * 4) / 1_000_000;
+    return NextResponse.json({ explanations: results, usage: { ...usage, cost } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
 

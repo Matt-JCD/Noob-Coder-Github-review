@@ -7,10 +7,11 @@ interface ExplorerItemProps {
   item: ColumnItem;
   isSelected: boolean;
   onClick: () => void;
+  onDeepDive?: () => void;
   recommendation?: string;
 }
 
-export default function ExplorerItem({ item, isSelected, onClick, recommendation }: ExplorerItemProps) {
+export default function ExplorerItem({ item, isSelected, onClick, onDeepDive, recommendation }: ExplorerItemProps) {
   const icon = getFileIcon(item.name, item.type);
 
   return (
@@ -50,9 +51,24 @@ export default function ExplorerItem({ item, isSelected, onClick, recommendation
             <div className="skeleton h-3 w-3/4" />
           </div>
         ) : item.explanation ? (
-          <p className="text-xs text-text-secondary mt-0.5 leading-relaxed line-clamp-2">
-            {item.explanation}
-          </p>
+          <>
+            <p className={`text-xs text-text-secondary mt-0.5 leading-relaxed ${item.isDeepDive ? "" : "line-clamp-2"}`}>
+              {item.explanation}
+            </p>
+            {!item.isDeepDive && onDeepDive && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDeepDive(); }}
+                className="text-[10px] text-accent/50 hover:text-accent mt-0.5 transition-colors"
+              >
+                Deep dive
+              </button>
+            )}
+            {item.isDeepDive && (
+              <span className="text-[10px] text-accent/40 mt-0.5 inline-block">
+                Sonnet
+              </span>
+            )}
+          </>
         ) : null}
       </div>
       {item.type === "folder" && (

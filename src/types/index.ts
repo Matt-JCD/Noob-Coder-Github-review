@@ -20,8 +20,10 @@ export interface ColumnItem {
   type: "folder" | "file";
   extension?: string;
   childCount?: number;
+  size?: number;
   explanation?: string;
   isLoading?: boolean;
+  isDeepDive?: boolean;
 }
 
 export interface Column {
@@ -73,6 +75,7 @@ export type ExplorerAction =
   | { type: "SET_EXPLANATIONS"; payload: { folderPath: string; explanations: Record<string, string> } }
   | { type: "TOGGLE_HIDDEN" }
   | { type: "NAVIGATE_TO_DEPTH"; payload: number }
+  | { type: "SET_DEEP_DIVE"; payload: { folderPath: string; itemName: string; explanation: string } }
   | { type: "SET_ITEMS_LOADING"; payload: { folderPath: string; itemNames: string[] } }
-  | { type: "UPDATE_TOKEN_USAGE"; payload: { inputTokens: number; outputTokens: number } }
+  | { type: "UPDATE_TOKEN_USAGE"; payload: { inputTokens: number; outputTokens: number; cost: number } }
   | { type: "RESET_TOKEN_USAGE" };

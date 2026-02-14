@@ -143,6 +143,26 @@ function explorerReducer(state: ExplorerState, action: ExplorerAction): Explorer
       return { ...state, columns: newColumns, fileDetail: null };
     }
 
+    case "SET_DEEP_DIVE": {
+      const { folderPath, itemName, explanation } = action.payload;
+      const newColumns = state.columns.map((col) => {
+        if (col.path !== folderPath) return col;
+        return {
+          ...col,
+          items: col.items.map((item) =>
+            item.name === itemName
+              ? { ...item, explanation, isLoading: false, isDeepDive: true }
+              : item
+          ),
+        };
+      });
+      // Update cache
+      const newCache = { ...state.explanationCache };
+      if (!newCache[folderPath]) newCache[folderPath] = {};
+      newCache[folderPath][itemName] = explanation;
+      return { ...state, columns: newColumns, explanationCache: newCache };
+    }
+
     case "SET_ITEMS_LOADING": {
       const { folderPath, itemNames } = action.payload;
       const nameSet = new Set(itemNames);
@@ -162,10 +182,10 @@ function explorerReducer(state: ExplorerState, action: ExplorerAction): Explorer
     case "UPDATE_TOKEN_USAGE": {
       const newInput = state.tokenUsage.inputTokens + action.payload.inputTokens;
       const newOutput = state.tokenUsage.outputTokens + action.payload.outputTokens;
-      const cost = (newInput * 3 + newOutput * 15) / 1_000_000;
+      const newCost = state.tokenUsage.estimatedCost + action.payload.cost;
       return {
         ...state,
-        tokenUsage: { inputTokens: newInput, outputTokens: newOutput, estimatedCost: cost },
+        tokenUsage: { inputTokens: newInput, outputTokens: newOutput, estimatedCost: newCost },
       };
     }
 
@@ -184,6 +204,7 @@ interface ExplorerContextValue {
   selectFolder: (depth: number, path: string) => void;
   selectFile: (depth: number, path: string) => void;
   requestExplanations: (folderPath: string, items: ColumnItem[]) => void;
+  requestDeepDive: (folderPath: string, item: ColumnItem) => void;
   toggleHidden: () => void;
   navigateToDepth: (depth: number) => void;
   resetTokenUsage: () => void;
@@ -282,6 +303,72 @@ export function ExplorerProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.error("Failed to fetch explanations:", err);
+      }
+    },
+    []
+  );
+
+  const requestDeepDive = useCallback(
+    async (folderPath: string, item: ColumnItem) => {
+      const currentState = stateRef.current;
+
+      // Mark item as loading
+      dispatch({
+        type: "SET_ITEMS_LOADING",
+        payload: { folderPath, itemNames: [item.name] },
+      });
+
+      try {
+        let childrenStr: string | undefined;
+        if (item.type === "folder") {
+          const kids = getChildrenAtPath(
+            currentState.tree,
+            item.path,
+            currentState.showHidden
+          );
+          childrenStr = kids
+            .slice(0, 10)
+            .map((c) => c.name)
+            .join(", ");
+          if (kids.length > 10) childrenStr += `, ... (${kids.length} total)`;
+        }
+
+        const res = await fetch("/api/deep-dive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: item.name,
+            type: item.type,
+            path: item.path,
+            repoDescription: currentState.repoMeta?.description || "",
+            children: childrenStr,
+            extension: item.extension,
+          }),
+        });
+
+        if (!res.ok) {
+          // Restore original explanation on error
+          dispatch({
+            type: "SET_EXPLANATIONS",
+            payload: { folderPath, explanations: { [item.name]: item.explanation || "" } },
+          });
+          return;
+        }
+
+        const data = await res.json();
+        dispatch({
+          type: "SET_DEEP_DIVE",
+          payload: { folderPath, itemName: item.name, explanation: data.explanation },
+        });
+        if (data.usage) {
+          dispatch({ type: "UPDATE_TOKEN_USAGE", payload: data.usage });
+        }
+      } catch (err) {
+        console.error("Deep dive failed:", err);
+        dispatch({
+          type: "SET_EXPLANATIONS",
+          payload: { folderPath, explanations: { [item.name]: item.explanation || "" } },
+        });
       }
     },
     []
@@ -433,6 +520,7 @@ export function ExplorerProvider({ children }: { children: React.ReactNode }) {
         selectFolder,
         selectFile,
         requestExplanations,
+        requestDeepDive,
         toggleHidden,
         navigateToDepth,
         resetTokenUsage,
