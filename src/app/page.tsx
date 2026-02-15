@@ -1,9 +1,19 @@
 import RepoInput from "@/components/RepoInput";
+import Image from "next/image";
 
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       <div className="text-center mb-10">
+        <div className="mb-6 flex justify-center">
+          <Image
+            src="/prefactor-logo-white.png"
+            alt="Prefactor"
+            width={200}
+            height={60}
+            priority
+          />
+        </div>
         <h1 className="text-4xl font-bold text-text-primary mb-3">
           Codebase Explainer
         </h1>

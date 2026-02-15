@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { useExplorer } from "@/context/ExplorerContext";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import ColumnExplorer from "@/components/ColumnExplorer";
@@ -40,7 +41,7 @@ export default function ExploreContent() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center max-w-md">
-          <p className="text-red-400 text-lg font-medium mb-2">Something went wrong</p>
+          <p className="text-red-400/80 text-lg font-medium mb-2">Something went wrong</p>
           <p className="text-text-secondary">{state.error}</p>
           <a
             href="/"
@@ -60,8 +61,16 @@ export default function ExploreContent() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-2 border-b border-border-color bg-bg-primary shrink-0">
         <div className="flex items-center gap-3">
-          <a href="/" className="text-sm font-semibold text-accent hover:underline">
-            Codebase Explainer
+          <a href="/" className="flex items-center gap-2 group">
+            <Image
+              src="/prefactor-symbol-white.png"
+              alt="Prefactor"
+              width={24}
+              height={24}
+            />
+            <span className="text-sm font-semibold text-accent group-hover:underline">
+              Codebase Explainer
+            </span>
           </a>
           <span className="text-text-muted">&middot;</span>
           <span className="text-sm text-text-secondary">

@@ -96,7 +96,7 @@ export default function CodeViewer({ code, filename }: CodeViewerProps) {
         </span>
       </button>
       {isOpen && (
-        <div className="max-h-[600px] overflow-auto bg-[#0d1117] text-sm">
+        <div className="max-h-[600px] overflow-auto bg-bg-primary text-sm">
           {isLoading ? (
             <div className="p-4 text-text-muted">Loading syntax highlighting...</div>
           ) : (

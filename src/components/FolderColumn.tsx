@@ -108,7 +108,7 @@ export default function FolderColumn({ column, depth }: FolderColumnProps) {
         </div>
       )}
       {allExplained && !fileEstimate && !deepDiveEstimate && (
-        <div className="p-2 border-b border-border-color text-xs text-green-400/70 text-center">
+        <div className="p-2 border-b border-border-color text-xs text-accent/70 text-center">
           All items explained
         </div>
       )}

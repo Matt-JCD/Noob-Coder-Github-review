@@ -35,13 +35,13 @@ export default function ExplorerItem({ item, isSelected, onClick, onDeepDive, re
             </span>
           )}
           {recommendation && (
-            <span className="text-yellow-400 text-xs shrink-0" title={recommendation}>
+            <span className="text-accent-dim text-xs shrink-0" title={recommendation}>
               ★
             </span>
           )}
         </div>
         {recommendation && !item.explanation && !item.isLoading && (
-          <p className="text-xs text-yellow-400/70 mt-0.5 leading-relaxed">
+          <p className="text-xs text-accent-dim/70 mt-0.5 leading-relaxed">
             {recommendation}
           </p>
         )}

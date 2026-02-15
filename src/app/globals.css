@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16213e;
-  --bg-surface: #1e2a45;
-  --bg-surface-hover: #253455;
-  --bg-selected: #2a3f6e;
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --border-color: #2d3a5c;
-  --accent: #60a5fa;
-  --accent-dim: #3b82f6;
+  --bg-primary: #0a0f0d;
+  --bg-secondary: #0f1614;
+  --bg-surface: #141e1a;
+  --bg-surface-hover: #1a2822;
+  --bg-selected: #1e3a2f;
+  --text-primary: #f0f5f3;
+  --text-secondary: #a3b8b0;
+  --text-muted: #5e756b;
+  --border-color: #243830;
+  --accent: #93d1bd;
+  --accent-dim: #08caa6;
 }
 
 @theme inline {
@@ -26,7 +26,8 @@
   --color-border-color: var(--border-color);
   --color-accent: var(--accent);
   --color-accent-dim: var(--accent-dim);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-onest);
+  --font-heading: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -34,6 +35,10 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-heading), var(--font-sans), system-ui, sans-serif;
 }
 
 /* Custom scrollbars */
